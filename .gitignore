@@ -1,0 +1,55 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Данные и модели
+career_model/
+data/
+*.h5
+*.pkl
+*.pkl.gz
+мой_карьерный_план.txt
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Временные файлы
+*.log
+*.tmp
+*.temp
+
+# Системные файлы
+.DS_Store
+Thumbs.db

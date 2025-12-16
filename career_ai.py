@@ -17,7 +17,6 @@ from tensorflow import keras
 import joblib
 import argparse
 from pathlib import Path
-import textwrap
 import json
 from datetime import datetime
 import warnings
@@ -25,14 +24,6 @@ warnings.filterwarnings('ignore')
 
 # ==================== КОНФИГУРАЦИЯ БАЗЫ ДАННЫХ ПРОФЕССИЙ ====================
 
-## 
-# @brief База данных с информацией о профессиях
-# @details Содержит 8 направлений с полной информацией о каждой профессии:
-# - Описание и требования
-# - Зарплаты и трудоустройство
-# - Необходимые навыки и личные качества
-# - Плюсы и минусы
-# - Рекомендации по обучению
 FIELD_DATABASE = {
     'Data Science': {
         'category': 'ИТ и анализ данных',
@@ -150,39 +141,14 @@ FIELD_DATABASE = {
 # ==================== КЛАСС НЕЙРОННОЙ СЕТИ ====================
 
 class CareerAdvisorAI:
-    """
-    @brief Класс искусственного интеллекта для рекомендации направлений обучения
-    
-    @details Использует обученную нейронную сеть для анализа профиля студента
-    и выдачи персонализированных рекомендаций по профессиям.
-    
-    @note Зависит от файлов модели, созданных в train_model.py
-    """
-    
     def __init__(self, model_dir='career_model'):
-        """
-        @brief Конструктор класса CareerAdvisorAI
-        
-        @param model_dir Путь к папке с обученной моделью
-        """
         self.model_dir = Path(model_dir)
-        self.model = None          ##< Объект нейронной сети TensorFlow/Keras
-        self.scaler = None         ##< Scaler для нормализации данных
-        self.label_encoder = None  ##< Кодировщик меток профессий
-        self.fields_info = FIELD_DATABASE  ##< База данных профессий
-        
+        self.model = None
+        self.scaler = None
+        self.label_encoder = None
+        self.fields_info = FIELD_DATABASE
+    
     def load_model(self):
-        """
-        @brief Загрузка обученной модели и вспомогательных файлов
-        
-        @details Загружает:
-        1. Нейронную сеть (.h5)
-        2. Scaler для нормализации (.pkl)
-        3. LabelEncoder для меток профессий (.pkl)
-        4. Метаданные модели (.json)
-        
-        @throws SystemExit Если файлы модели не найдены или повреждены
-        """
         if not self.model_dir.exists():
             print(f"ОШИБКА: Папка с моделью не найдена: {self.model_dir}")
             print("       Сначала обучите модель: python train_model.py")
@@ -199,7 +165,6 @@ class CareerAdvisorAI:
             self.scaler = joblib.load(self.model_dir / 'scaler.pkl')
             self.label_encoder = joblib.load(self.model_dir / 'label_encoder.pkl')
             
-            # Загружаем метаданные для информации
             metadata_path = self.model_dir / 'model_metadata.json'
             if metadata_path.exists():
                 with open(metadata_path, 'r', encoding='utf-8') as f:
@@ -216,15 +181,6 @@ class CareerAdvisorAI:
             sys.exit(1)
     
     def analyze_student_profile(self, csv_path):
-        """
-        @brief Анализ профиля студента и генерация рекомендаций
-        
-        @param csv_path Путь к CSV файлу с данными студента
-        @return Кортеж: (рекомендации, данные студента, все рекомендации)
-        
-        @details Читает CSV файл, подготавливает данные, запускает нейросеть
-        и возвращает топ-5 рекомендаций с полной информацией о каждой профессии
-        """
         print(f"Анализирую профиль студента из {csv_path}")
         
         try:
@@ -240,10 +196,10 @@ class CareerAdvisorAI:
         print("ИИ анализирует ваш профиль...")
         predictions = self.model.predict(X_processed, verbose=0)[0]
         
-        top_indices = np.argsort(predictions)[::-1][:5]  # Берем топ-5
+        top_indices = np.argsort(predictions)[::-1][:5]
         
         recommendations = []
-        for i, idx in enumerate(top_indices[:5]):  # Показываем топ-5
+        for i, idx in enumerate(top_indices[:5]):
             field_name = self.label_encoder.inverse_transform([idx])[0]
             probability = predictions[idx] * 100
             
@@ -260,8 +216,10 @@ class CareerAdvisorAI:
                 'probability': round(probability, 1),
                 'match_level': self._get_match_level(probability),
                 'category': info.get('category', ''),
-                'avg_salary': f"{info.get('avg_salary', 0):,} руб.",
-                'employment': f"{info.get('employment_rate', 0)}%",
+                'avg_salary': info.get('avg_salary', 0),
+                'avg_salary_formatted': f"{info.get('avg_salary', 0):,} руб.",
+                'employment_rate': info.get('employment_rate', 0),
+                'employment_formatted': f"{info.get('employment_rate', 0)}%",
                 'study_years': info.get('study_years', 4),
                 'description': info.get('human_description', ''),
                 'skills': info.get('skills_needed', []),
@@ -272,7 +230,6 @@ class CareerAdvisorAI:
                 'universities': info.get('universities', [])
             })
         
-        # Также возвращаем все 5 рекомендаций для сохранения в файл
         all_recommendations = []
         for i, idx in enumerate(top_indices):
             field_name = self.label_encoder.inverse_transform([idx])[0]
@@ -280,21 +237,14 @@ class CareerAdvisorAI:
             all_recommendations.append({
                 'rank': i + 1,
                 'field': field_name,
-                'probability': round(probability, 1)
+                'probability': round(probability, 1),
+                'probability_raw': float(probability),
+                'field_encoded': int(idx)
             })
         
-        return recommendations, student_data, all_recommendations
+        return recommendations, student_data, all_recommendations, predictions
     
     def _prepare_student_data(self, student_df):
-        """
-        @brief Подготовка данных студента для нейросети
-        
-        @param student_df DataFrame с данными студента
-        @return Нормализованные данные, готовые для подачи в нейросеть
-        
-        @details Приводит данные к формату, используемому при обучении,
-        заполняет пропущенные значения значениями по умолчанию
-        """
         expected_features = [
             'math_skill', 'programming_skill', 'communication_skill',
             'creativity', 'analytical_thinking', 'memory',
@@ -312,29 +262,20 @@ class CareerAdvisorAI:
             if feature in student_df.columns:
                 processed_data[feature] = student_df[feature].iloc[0]
             else:
-                # Значения по умолчанию для пропущенных признаков
                 default_values = {
                     'desired_salary': 120000,
-                    'preferred_work_env': 2,  # гибридный
+                    'preferred_work_env': 2,
                     'work_life_balance': 3.5,
                 }
                 processed_data[feature] = default_values.get(feature, 3.0)
         
-        # Создаем DataFrame с правильным порядком колонок
         processed_df = pd.DataFrame([processed_data])[expected_features]
         
-        # Преобразуем как при обучении
         X_processed = self.scaler.transform(processed_df.values.astype('float32'))
         
         return X_processed
     
     def _get_match_level(self, probability):
-        """
-        @brief Определение уровня совпадения по вероятности
-        
-        @param probability Вероятность совпадения в процентах
-        @return Текстовое описание уровня совпадения
-        """
         if probability >= 85:
             return "ИДЕАЛЬНОЕ СОЧЕТАНИЕ"
         elif probability >= 70:
@@ -349,171 +290,155 @@ class CareerAdvisorAI:
 # ==================== КЛАСС ИНТЕРФЕЙСА ====================
 
 class CareerAdvisorInterface:
-    """
-    @brief Класс для вывода результатов в удобном формате
-    
-    @details Создает красивый текстовый интерфейс с результатами анализа,
-    сохраняет результаты в файл и отображает детальную информацию
-    """
-    
     def __init__(self, advisor):
-        """
-        @brief Конструктор интерфейса
-        
-        @param advisor Объект CareerAdvisorAI для получения рекомендаций
-        """
         self.advisor = advisor
     
     def print_header(self, student_name=None):
-        """
-        @brief Вывод заголовка программы
-        
-        @param student_name Имя студента для персонализации
-        """
         print("\n" + "="*80)
-        print("🎯 УМНЫЙ ВЫБОР НАПРАВЛЕНИЯ ОБУЧЕНИЯ")
+        print("УМНЫЙ ВЫБОР НАПРАВЛЕНИЯ ОБУЧЕНИЯ")
         print("="*80)
         
         if student_name:
-            print(f"\n👤 Студент: {student_name}")
+            print(f"\nСтудент: {student_name}")
         
-        print("\n" + "🔍 ИИ анализирует ваши навыки, интересы и личность...")
+        print("\nИИ анализирует ваши навыки, интересы и личность...")
         print("="*80)
     
     def print_recommendation(self, rec, detailed=True):
-        """
-        @brief Вывод одной рекомендации
-        
-        @param rec Словарь с информацией о рекомендации
-        @param detailed Флаг детального вывода (True - полная информация)
-        """
-        print(f"\n{'⭐' * rec['rank']} РЕКОМЕНДАЦИЯ #{rec['rank']}:")
-        print(f"{'='*60}")
-        print(f"🏷  НАПРАВЛЕНИЕ:  {rec['field']}")
-        print(f"📊  СОВПАДЕНИЕ:   {rec['match_level']} ({rec['probability']}%)")
-        print(f"📈  КАТЕГОРИЯ:    {rec['category']}")
-        print(f"💰  СРЕДНЯЯ ЗП:   {rec['avg_salary']}")
-        print(f"📝  ТРУДОУСТРОЙСТВО: {rec['employment']}")
-        print(f"⏳  СРОК ОБУЧЕНИЯ: {rec['study_years']} лет")
+        print(f"\nРЕКОМЕНДАЦИЯ #{rec['rank']}:")
+        print(f"="*60)
+        print(f"НАПРАВЛЕНИЕ:  {rec['field']}")
+        print(f"СОВПАДЕНИЕ:   {rec['match_level']} ({rec['probability']}%)")
+        print(f"КАТЕГОРИЯ:    {rec['category']}")
+        print(f"СРЕДНЯЯ ЗП:   {rec['avg_salary_formatted']}")
+        print(f"ТРУДОУСТРОЙСТВО: {rec['employment_formatted']}")
+        print(f"СРОК ОБУЧЕНИЯ: {rec['study_years']} лет")
         
         if detailed:
-            print(f"\n📋  ОПИСАНИЕ:")
+            print(f"\nОПИСАНИЕ:")
             print(f"   {rec['description']}")
             
-            print(f"\n🛠  НЕОБХОДИМЫЕ НАВЫКИ:")
+            print(f"\nНЕОБХОДИМЫЕ НАВЫКИ:")
             for skill in rec['skills']:
-                print(f"   • {skill}")
+                print(f"   - {skill}")
             
-            print(f"\n👤  ПОРТРЕТ СПЕЦИАЛИСТА:")
+            print(f"\nПОРТРЕТ СПЕЦИАЛИСТА:")
             print(f"   {rec['personality']}")
             
-            print(f"\n✅  ПРЕИМУЩЕСТВА:")
+            print(f"\nПРЕИМУЩЕСТВА:")
             for pro in rec['pros']:
-                print(f"   ✓ {pro}")
+                print(f"   + {pro}")
             
-            print(f"\n⚠️   СЛОЖНОСТИ:")
+            print(f"\nСЛОЖНОСТИ:")
             for con in rec['cons']:
-                print(f"   ✗ {con}")
+                print(f"   - {con}")
             
-            print(f"\n🎯  СЛЕДУЮЩИЕ ШАГИ:")
+            print(f"\nСЛЕДУЮЩИЕ ШАГИ:")
             for i, step in enumerate(rec['next_steps'], 1):
                 print(f"   {i}. {step}")
             
-            print(f"\n🏫  ВУЗЫ ДЛЯ ПОСТУПЛЕНИЯ:")
+            print(f"\nВУЗЫ ДЛЯ ПОСТУПЛЕНИЯ:")
             for uni in rec['universities']:
-                print(f"   • {uni}")
+                print(f"   - {uni}")
     
     def print_all_recommendations(self, recommendations, student_data, csv_path):
-        """
-        @brief Вывод всех рекомендаций и данных студента
-        
-        @param recommendations Список рекомендаций
-        @param student_data DataFrame с данными студента
-        @param csv_path Путь к исходному CSV файлу
-        """
         self.print_header()
         
-        print("\n📊 ВАШИ ОТВЕТЫ:")
+        print("\nВАШИ ОТВЕТЫ:")
         print("-"*40)
-        # Показать ключевые ответы студента
         key_answers = student_data.iloc[0].to_dict()
-        for key, value in list(key_answers.items())[:10]:  # Покажем первые 10
+        for key, value in list(key_answers.items())[:10]:
             print(f"{key:<25}: {value}")
         
         print("\n" + "="*80)
-        print("🤖 ТОП-5 РЕКОМЕНДАЦИЙ ИСКУССТВЕННОГО ИНТЕЛЛЕКТА")
+        print("ТОП-5 РЕКОМЕНДАЦИЙ ИСКУССТВЕННОГО ИНТЕЛЛЕКТА")
         print("="*80)
         
         for i, rec in enumerate(recommendations):
-            self.print_recommendation(rec, detailed=(i == 0))  # Подробно только первую
+            self.print_recommendation(rec, detailed=(i == 0))
             
             if i < len(recommendations) - 1:
                 print("\n" + "-"*60)
         
-        # Таблица со всеми 5 рекомендациями
         print("\n" + "="*80)
-        print("📋 ПОЛНЫЙ СПИСОК РЕКОМЕНДАЦИЙ")
+        print("ПОЛНЫЙ СПИСОК РЕКОМЕНДАЦИЙ")
         print("="*80)
         print("Ранг | Направление          | Совпадение  | Уровень")
         print("-"*60)
         
         for i, rec in enumerate(recommendations):
             print(f"  {rec['rank']:<3} | {rec['field']:<20} | {rec['probability']:>6.1f}%     | {rec['match_level']}")
+
+# ==================== СОЗДАНИЕ CSV ФАЙЛА С ТОП-5 РЕКОМЕНДАЦИЯМИ ====================
+
+def create_top5_recommendations_csv(all_recommendations, csv_path):
+    """
+    Создает CSV файл ТОЛЬКО с топ-5 рекомендациями в числовом формате
     
-    def save_results_to_file(self, recommendations, student_data, csv_path):
-        """
-        @brief Сохранение результатов анализа в CSV файл
+    @param all_recommendations: список из 5 рекомендаций
+    @param csv_path: путь к исходному файлу
+    
+    @return: создает CSV файл с 3 колонками на каждую рекомендацию
+    """
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    
+    # Создаем словарь для одной строки данных
+    row_data = {}
+    
+    # Для каждой из 5 рекомендаций добавляем 3 колонки
+    for i, rec in enumerate(all_recommendations[:5]):
+        prefix = f"rec_{i+1}"
         
-        @param recommendations Список рекомендаций
-        @param student_data DataFrame с данными студента
-        @param csv_path Путь к исходному файлу
+        # 1. Индекс профессии (0-7)
+        row_data[f"{prefix}_field_encoded"] = rec['field_encoded']
         
-        @details Создает файл с именем career_results_YYYYMMDD_HHMMSS.csv
-        с полными результатами анализа
-        """
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        output_file = f"career_results_{timestamp}.csv"
+        # 2. Вероятность в процентах (0.0-100.0)
+        row_data[f"{prefix}_probability"] = rec['probability_raw']
         
-        # Создаем DataFrame с результатами
-        results_data = []
+        # 3. Уровень совпадения (1-5)
+        probability = rec['probability_raw']
+        if probability >= 85:
+            match_code = 5  # ИДЕАЛЬНОЕ СОЧЕТАНИЕ
+        elif probability >= 70:
+            match_code = 4  # ОТЛИЧНОЕ СОЧЕТАНИЕ
+        elif probability >= 55:
+            match_code = 3  # ХОРОШЕЕ СОЧЕТАНИЕ
+        elif probability >= 40:
+            match_code = 2  # СРЕДНЕЕ СОЧЕТАНИЕ
+        else:
+            match_code = 1  # НИЗКОЕ СОЧЕТАНИЕ
         
-        # Добавляем основную информацию о студенте
-        student_info = {f"student_{k}": v for k, v in student_data.iloc[0].to_dict().items()}
-        
-        # Добавляем рекомендации
-        for i, rec in enumerate(recommendations):
-            prefix = f"recommendation_{i+1}_"
-            results_data.append({
-                f"{prefix}field": rec['field'],
-                f"{prefix}probability": rec['probability'],
-                f"{prefix}match_level": rec['match_level'],
-                f"{prefix}category": rec['category'],
-                f"{prefix}avg_salary": rec['avg_salary'],
-                f"{prefix}employment_rate": rec['employment'],
-                f"{prefix}study_years": rec['study_years']
-            })
-        
-        # Объединяем все данные
-        final_dict = {**student_info}
-        for data in results_data:
-            final_dict.update(data)
-        
-        df_results = pd.DataFrame([final_dict])
-        df_results.to_csv(output_file, index=False, encoding='utf-8-sig')
-        
-        print(f"\n📁 Результаты сохранены в файл: {output_file}")
+        row_data[f"{prefix}_match_level_code"] = match_code
+    
+    # Создаем DataFrame с одной строкой
+    df = pd.DataFrame([row_data])
+    
+    # Сохраняем в CSV файл
+    filename = f"career_top5_recommendations_{timestamp}.csv"
+    df.to_csv(filename, index=False, encoding='utf-8-sig')
+    
+    print(f"\nСоздан файл с топ-5 рекомендациями: {filename}")
+    print("\nСОДЕРЖАНИЕ ФАЙЛА:")
+    print("="*60)
+    print(df.to_string())
+    
+    print(f"\nСтруктура данных (15 колонок):")
+    print("-"*60)
+    print("rec_1_field_encoded    - индекс первой рекомендации (0-7)")
+    print("rec_1_probability      - вероятность первой рекомендации (%)")
+    print("rec_1_match_level_code - уровень совпадения первой (1-5)")
+    print("...")
+    print("rec_5_field_encoded    - индекс пятой рекомендации (0-7)")
+    print("rec_5_probability      - вероятность пятой рекомендации (%)")
+    print("rec_5_match_level_code - уровень совпадения пятой (1-5)")
+    
+    return filename
 
 # ==================== ГЕНЕРАЦИЯ ШАБЛОНА CSV ====================
 
 def create_template_csv():
-    """
-    @brief Создание шаблона CSV файла для тестирования системы
-    
-    @details Создает файл student_profile_template.csv с примером данных,
-    который можно отредактировать для тестирования разных профилей студентов
-    """
     print("\n" + "="*80)
-    print("📝 СОЗДАНИЕ ШАБЛОНА ДЛЯ ТЕСТИРОВАНИЯ")
+    print("СОЗДАНИЕ ШАБЛОНА ДЛЯ ТЕСТИРОВАНИЯ")
     print("="*80)
     
     template_data = {
@@ -539,7 +464,7 @@ def create_template_csv():
         'art_interest': [2.0],
         'sports_interest': [3.5],
         'desired_salary': [150000],
-        'preferred_work_env': [2],  # 1-офис, 2-гибрид, 3-удаленка
+        'preferred_work_env': [2],
         'work_life_balance': [3.8]
     }
     
@@ -549,11 +474,11 @@ def create_template_csv():
     df_template.to_csv(filename, index=False)
     
     print(f"\nШаблон создан: {filename}")
-    print("\n📋 СТРУКТУРА ФАЙЛА:")
+    print("\nСТРУКТУРА ФАЙЛА:")
     print("-"*40)
     print(df_template.to_string())
     
-    print(f"\n📌 ИНСТРУКЦИЯ:")
+    print(f"\nИНСТРУКЦИЯ:")
     print("1. Измените значения в файле {filename}")
     print("2. Шкала оценок: 1.0 (низкий) - 5.0 (высокий)")
     print("3. desired_salary: желаемая зарплата в рублях")
@@ -564,17 +489,6 @@ def create_template_csv():
 # ==================== ОСНОВНАЯ ФУНКЦИЯ ====================
 
 def main():
-    """
-    @brief Основная функция программы CareerAI
-    
-    @details Обрабатывает аргументы командной строки, запускает ИИ,
-    анализирует профиль студента и выводит рекомендации
-    
-    @note Аргументы:
-      csv_file: CSV файл с профилем студента
-      --create-template: создать шаблон CSV
-      --student-name: указать имя студента
-    """
     parser = argparse.ArgumentParser(description='ИИ для выбора направления обучения')
     parser.add_argument('csv_file', nargs='?', help='CSV файл с профилем студента')
     parser.add_argument('--create-template', action='store_true', 
@@ -594,15 +508,13 @@ def main():
         print("Или создайте шаблон: python career_ai.py --create-template")
         sys.exit(1)
     
-    # Проверяем существование файла
     csv_path = Path(args.csv_file)
     if not csv_path.exists():
         print(f"ОШИБКА: Файл не найден: {args.csv_file}")
         print(f"Создайте шаблон: python career_ai.py --create-template")
         sys.exit(1)
     
-    # Инициализация ИИ
-    print("\n🤖 ЗАПУСК ИСКУССТВЕННОГО ИНТЕЛЛЕКТА")
+    print("\nЗАПУСК ИСКУССТВЕННОГО ИНТЕЛЛЕКТА")
     print("="*80)
     
     advisor = CareerAdvisorAI()
@@ -611,16 +523,19 @@ def main():
     interface = CareerAdvisorInterface(advisor)
     
     try:
-        # Анализ профиля
-        recommendations, student_data, all_recommendations = advisor.analyze_student_profile(args.csv_file)
+        recommendations, student_data, all_recommendations, predictions = advisor.analyze_student_profile(args.csv_file)
         
-        # Вывод результатов
         interface.print_all_recommendations(recommendations, student_data, args.csv_file)
         
-        print(f"\n🎉 АНАЛИЗ ЗАВЕРШЕН! Удачи в выборе профессии!")
+        print(f"\nАНАЛИЗ ЗАВЕРШЕН! Удачи в выборе профессии!")
+        
+        # Создаем CSV файл ТОЛЬКО с топ-5 рекомендациями
+        csv_file = create_top5_recommendations_csv(all_recommendations, csv_path)
+        
+        print(f"\nРезультаты сохранены в файле: {csv_file}")
         
     except Exception as e:
-        print(f"\n❌ ОШИБКА: {e}")
+        print(f"\nОШИБКА: {e}")
         print("Проверьте формат CSV файла или создайте новый шаблон:")
         print("python career_ai.py --create-template")
 

@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
 @file train_model.py
-@brief Обучение нейронной сети для системы CareerAI
-@details Создает данные и обучает модель для рекомендации 
-направлений с точностью 85-90%
-@author Разработчик
+@brief CareerAI Neural Network Training
+@details Creates data and trains model for career recommendation 
+with 85-90% accuracy
+@author Developer
 @version 2.0
 @date 2025
 """
@@ -29,30 +29,26 @@ tf.random.set_seed(42)
 
 def create_realistic_data():
     """
-    @brief Создание реалистичных данных для обучения модели
+    @brief Create realistic training data
     
-    @details Генерирует синтетические данные с естественными вариациями:
-    - 8 профессий по 600 примеров каждая (всего 4800)
-    - 10% шума в метках для реалистичности
-    - Естественные перекрытия между классами
-    - 24 признака на каждого студента
+    @details Generates synthetic data with natural variations:
+    - 8 professions x 600 examples each (total 4800)
+    - 10% label noise for realism
+    - Natural overlaps between classes
+    - 24 features per student
     
-    @return DataFrame с тренировочными данными
+    @return DataFrame with training data
     """
-    print("Создание РЕАЛИСТИЧНЫХ данных...")
+    print("Creating REALISTIC data...")
     
     data = []
-    n_per_class = 600  ##< Количество примеров на каждый класс
+    n_per_class = 600
     
     classes = [
         'Data Science', 'Software Engineering', 'Computer Science',
         'Psychology', 'Design', 'Economics', 'Medicine', 'Linguistics'
     ]
     
-    ## 
-    # @brief Паттерны характеристик для каждой профессии
-    # @details Для каждой профессии заданы средние значения и стандартные отклонения
-    # ключевых характеристик в формате: {'признак': (среднее, std_dev)}
     class_patterns = {
         'Data Science': {
             'math_skill': (4.5, 0.6), 'programming_skill': (4.4, 0.5),
@@ -105,7 +101,6 @@ def create_realistic_data():
         }
     }
     
-    ## @brief Список всех признаков модели
     all_features = [
         'math_skill', 'programming_skill', 'communication_skill',
         'creativity', 'analytical_thinking', 'memory',
@@ -117,7 +112,6 @@ def create_realistic_data():
         'desired_salary', 'preferred_work_env', 'work_life_balance'
     ]
     
-    # Генерация данных для каждой профессии
     for field in classes:
         pattern = class_patterns.get(field, {})
         
@@ -129,7 +123,6 @@ def create_realistic_data():
                     mean, std = pattern[feature]
                     value = np.random.normal(mean, std)
                 else:
-                    # Средние значения с вариациями для остальных признаков
                     if feature in ['desired_salary', 'preferred_work_env', 'work_life_balance']:
                         if feature == 'desired_salary':
                             salaries = {
@@ -147,7 +140,6 @@ def create_realistic_data():
                     else:
                         value = np.random.normal(3.0, 1.0)
                 
-                # Ограничиваем значения разумными пределами
                 if feature not in ['desired_salary', 'preferred_work_env', 'work_life_balance']:
                     value = max(1.0, min(5.0, value))
                     value = round(value, 1)
@@ -161,9 +153,6 @@ def create_realistic_data():
     
     df = pd.DataFrame(data)
     
-    ## @brief Добавление 10% шума в метки для реалистичности
-    # @details Некоторые студенты могут выбирать профессии, не соответствующие
-    # их профилю (личные предпочтения, внешние факторы и т.д.)
     np.random.seed(42)
     noise_indices = np.random.choice(len(df), size=int(len(df) * 0.1), replace=False)
     all_fields = df['chosen_field'].unique()
@@ -173,20 +162,18 @@ def create_realistic_data():
         other_fields = [f for f in all_fields if f != current_field]
         df.at[idx, 'chosen_field'] = np.random.choice(other_fields)
     
-    print(f"\nСоздано {len(df)} РЕАЛЬНЫХ примеров")
-    print("(с 10% шума в метках для реалистичности)")
+    print(f"\nCreated {len(df)} REAL examples")
+    print("(with 10% label noise for realism)")
     
-    # Анализ перекрывающихся профилей
-    print("\nПримеры перекрывающихся профилей:")
-    print("1. Экономист с хорошим программированием:")
+    print("\nOverlapping profile examples:")
+    print("1. Economist with good programming:")
     econ_it = df[(df['chosen_field'] == 'Economics') & (df['programming_skill'] > 4.0)]
-    print(f"   Найдено: {len(econ_it)} примеров")
+    print(f"   Found: {len(econ_it)} examples")
     
-    print("2. Психолог с аналитическим мышлением:")
+    print("2. Psychologist with analytical thinking:")
     psych_analytical = df[(df['chosen_field'] == 'Psychology') & (df['analytical_thinking'] > 4.0)]
-    print(f"   Найдено: {len(psych_analytical)} примеров")
+    print(f"   Found: {len(psych_analytical)} examples")
     
-    # Сохранение данных
     Path('data').mkdir(exist_ok=True)
     df.to_csv('data/training_data.csv', index=False)
     
@@ -194,48 +181,42 @@ def create_realistic_data():
 
 def build_robust_model(input_dim, num_classes):
     """
-    @brief Создание надежной нейронной сети
+    @brief Build robust neural network
     
-    @param input_dim Количество входных признаков (24)
-    @param num_classes Количество классов (профессий) для предсказания (8)
-    @return Скомпилированная модель TensorFlow/Keras
+    @param input_dim Number of input features (24)
+    @param num_classes Number of classes (professions) to predict (8)
+    @return Compiled TensorFlow/Keras model
     
-    @details Архитектура модели:
-    - 4 скрытых полносвязных слоя
-    - BatchNormalization для стабильности обучения
-    - Dropout для предотвращения переобучения
-    - L2 регуляризация
-    - Adam оптимизатор с learning_rate=0.0005
+    @details Model architecture:
+    - 4 hidden dense layers
+    - BatchNormalization for stability
+    - Dropout for overfitting prevention
+    - L2 regularization
+    - Adam optimizer with learning_rate=0.0005
     """
     
     inputs = keras.Input(shape=(input_dim,))
     
-    # Первый скрытый слой с регуляризацией
     x = layers.Dense(256, activation='relu',
                     kernel_regularizer=regularizers.l2(0.001))(inputs)
     x = layers.BatchNormalization()(x)
     x = layers.Dropout(0.4)(x)
     
-    # Второй скрытый слой
     x = layers.Dense(128, activation='relu',
                     kernel_regularizer=regularizers.l2(0.001))(x)
     x = layers.BatchNormalization()(x)
     x = layers.Dropout(0.3)(x)
     
-    # Третий скрытый слой
     x = layers.Dense(64, activation='relu')(x)
     x = layers.BatchNormalization()(x)
     x = layers.Dropout(0.2)(x)
     
-    # Четвертый скрытый слой
     x = layers.Dense(32, activation='relu')(x)
     
-    # Выходной слой с softmax активацией
     outputs = layers.Dense(num_classes, activation='softmax')(x)
     
     model = keras.Model(inputs=inputs, outputs=outputs)
     
-    # Компиляция модели с метриками Top-1 и Top-3 точности
     model.compile(
         optimizer=keras.optimizers.Adam(learning_rate=0.0005),
         loss='sparse_categorical_crossentropy',
@@ -250,41 +231,38 @@ def build_robust_model(input_dim, num_classes):
 
 def main():
     """
-    @brief Основная функция обучения модели
+    @brief Main training function
     
-    @details Этапы обучения:
-    1. Создание реалистичных данных
-    2. Подготовка и нормализация данных
-    3. Создание и компиляция модели
-    4. Обучение с использованием callback'ов
-    5. Оценка на тестовых данных
-    6. Сохранение модели и метаданных
+    @details Training stages:
+    1. Create realistic data
+    2. Prepare and normalize data
+    3. Create and compile model
+    4. Train with callbacks
+    5. Evaluate on test data
+    6. Save model and metadata
     
-    @note Ожидаемая точность: 85-90% (Top-1), 95-98% (Top-3)
+    @note Expected accuracy: 85-90% (Top-1), 95-98% (Top-3)
     """
     print("="*80)
-    print("ОБУЧЕНИЕ РЕАЛЬНОЙ МОДЕЛИ (ЦЕЛЬ: 85-90% ТОЧНОСТИ)")
+    print("REAL MODEL TRAINING (TARGET: 85-90% ACCURACY)")
     print("="*80)
     
     Path('career_model').mkdir(exist_ok=True)
     
-    print("\n1. Создание реалистичных данных...")
+    print("\n1. Creating realistic data...")
     df = create_realistic_data()
     
-    print("\n2. Подготовка данных...")
+    print("\n2. Preparing data...")
     feature_columns = [col for col in df.columns if col != 'chosen_field']
     X = df[feature_columns].values.astype('float32')
     y = df['chosen_field'].values
     
-    # Кодирование меток
     label_encoder = LabelEncoder()
     y_encoded = label_encoder.fit_transform(y)
     
-    # Нормализация признаков
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(X)
     
-    # Разделение на тренировочную, валидационную и тестовую выборки
     X_train, X_temp, y_train, y_temp = train_test_split(
         X_scaled, y_encoded, test_size=0.2, random_state=42, stratify=y_encoded
     )
@@ -293,23 +271,18 @@ def main():
         X_temp, y_temp, test_size=0.5, random_state=42, stratify=y_temp
     )
     
-    print(f"   Обучающие: {X_train.shape[0]} (80%)")
-    print(f"   Валидационные: {X_val.shape[0]} (10%)")
-    print(f"   Тестовые: {X_test.shape[0]} (10%)")
+    print(f"   Training: {X_train.shape[0]} (80%)")
+    print(f"   Validation: {X_val.shape[0]} (10%)")
+    print(f"   Test: {X_test.shape[0]} (10%)")
     
-    # Вычисление весов классов для балансировки
     class_weights = compute_class_weight('balanced', classes=np.unique(y_train), y=y_train)
     class_weight_dict = {i: float(weight) for i, weight in enumerate(class_weights)}
     
-    print("\n3. Создание модели...")
+    print("\n3. Building model...")
     model = build_robust_model(X.shape[1], len(label_encoder.classes_))
     
-    print("\n4. Обучение модели...")
+    print("\n4. Training model...")
     
-    ## @brief Callback'ы для улучшения обучения
-    # @details EarlyStopping: останавливает обучение при отсутствии улучшений
-    # @details ReduceLROnPlateau: уменьшает скорость обучения при застое
-    # @details ModelCheckpoint: сохраняет лучшую модель
     callbacks = [
         keras.callbacks.EarlyStopping(
             monitor='val_top1_acc',
@@ -345,33 +318,30 @@ def main():
         verbose=1
     )
     
-    print("\n5. Загрузка лучшей модели...")
+    print("\n5. Loading best model...")
     model = keras.models.load_model('career_model/best_model.h5')
     
-    print("\n6. Оценка на тестовых данных...")
+    print("\n6. Evaluating on test data...")
     test_results = model.evaluate(X_test, y_test, verbose=0)
     
     print(f"\n{'='*60}")
-    print("ФИНАЛЬНЫЕ РЕЗУЛЬТАТЫ:")
+    print("FINAL RESULTS:")
     print('='*60)
     print(f"  Accuracy:           {test_results[1]:.2%}")
     print(f"  Top-1 Accuracy:     {test_results[2]:.2%}")
     print(f"  Top-3 Accuracy:     {test_results[3]:.2%}")
     
-    # Предсказания и анализ ошибок
     y_pred = model.predict(X_test, verbose=0)
     y_pred_classes = np.argmax(y_pred, axis=1)
     
-    print(f"\nОтчет по классификации:")
+    print(f"\nClassification report:")
     print('='*60)
     print(classification_report(y_test, y_pred_classes, target_names=label_encoder.classes_))
     
-    # Матрица ошибок для анализа
     cm = confusion_matrix(y_test, y_pred_classes)
-    print(f"\nАнализ сложных случаев (ошибки классификации):")
+    print(f"\nAnalysis of difficult cases (misclassifications):")
     print('='*60)
     
-    # Находим пары классов, которые путаются чаще всего
     error_pairs = []
     for i in range(len(label_encoder.classes_)):
         for j in range(len(label_encoder.classes_)):
@@ -380,19 +350,17 @@ def main():
     
     error_pairs.sort(reverse=True)
     
-    print("Наиболее частые ошибки:")
+    print("Most common errors:")
     for count, true_idx, pred_idx in error_pairs[:5]:
         true_class = label_encoder.inverse_transform([true_idx])[0]
         pred_class = label_encoder.inverse_transform([pred_idx])[0]
-        print(f"  {true_class} → {pred_class}: {count} ошибок")
+        print(f"  {true_class} -> {pred_class}: {count} errors")
     
-    print("\n7. Сохранение модели...")
+    print("\n7. Saving model...")
     model.save('career_model/career_model.h5')
     joblib.dump(scaler, 'career_model/scaler.pkl')
     joblib.dump(label_encoder, 'career_model/label_encoder.pkl')
     
-    ## @brief Метаданные модели для документации
-    # @details Сохраняются в JSON файл для отслеживания версий и параметров
     metadata = {
         'training_date': pd.Timestamp.now().isoformat(),
         'total_samples': len(df),
@@ -422,23 +390,23 @@ def main():
         json.dump(metadata, f, indent=2, ensure_ascii=False)
     
     print(f"\n{'='*80}")
-    print("РЕАЛЬНАЯ МОДЕЛЬ ОБУЧЕНА!")
+    print("REAL MODEL TRAINED SUCCESSFULLY!")
     print('='*80)
     
-    print(f"\nОЖИДАЕМАЯ ПРОИЗВОДИТЕЛЬНОСТЬ:")
+    print(f"\nEXPECTED PERFORMANCE:")
     print(f"  • Accuracy:       85-90%")
     print(f"  • Top-3 Accuracy: 95-98%")
-    print(f"  • Реалистичность: ВЫСОКАЯ")
+    print(f"  • Realism:        HIGH")
     
-    print(f"\nФАЙЛЫ МОДЕЛИ:")
+    print(f"\nMODEL FILES:")
     print(f"  • career_model.h5")
     print(f"  • best_model.h5")
     print(f"  • scaler.pkl")
     print(f"  • label_encoder.pkl")
     print(f"  • model_metadata.json")
     
-    print(f"\nТеперь модель готова к РЕАЛЬНОМУ использованию!")
-    print(f"Запустите: python career_ai.py ваш_файл.csv")
+    print(f"\nModel is ready for REAL usage!")
+    print(f"Run: python career_ai.py your_file.csv")
 
 if __name__ == "__main__":
     main()

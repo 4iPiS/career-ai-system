@@ -46,15 +46,28 @@ venv.bak/
 .env.*
 !.env.example
 
-# Runtime data and models (generated locally / in Docker volumes)
-career_model/
+# Runtime data (не коммитить анкеты и обучающие выборки)
 data/
 output/
 profiles/
+
+# Старые форматы моделей
 *.h5
-*.keras
+
+# Локальные pkl/keras вне career_model/
 *.pkl
 *.pkl.gz
+*.keras
+!career_model/scaler.pkl
+!career_model/multilabel_binarizer.pkl
+!career_model/career_model.keras
+
+# В career_model/ в git только готовые артефакты (см. train_model.py)
+career_model/*
+!career_model/career_model.keras
+!career_model/scaler.pkl
+!career_model/multilabel_binarizer.pkl
+!career_model/direction_key_skills.json
 
 # Local notes / junk
 мой_карьерный_план.txt

@@ -13,6 +13,7 @@ COPY config/ ./config/
 COPY templates/ ./templates/
 COPY static/ ./static/
 COPY examples/ ./examples/
+COPY career_model/ ./career_model/
 COPY docker/entrypoint.sh ./docker/entrypoint.sh
 COPY *.py ./
 
@@ -27,6 +28,6 @@ ENV PYTHONUNBUFFERED=1
 
 EXPOSE 7777
 
-VOLUME ["/app/data", "/app/career_model", "/app/output"]
+VOLUME ["/app/data", "/app/output"]
 
 ENTRYPOINT ["/app/docker/entrypoint.sh"]

@@ -29,7 +29,7 @@ docker compose up --build
 
 Откройте http://localhost:7777
 
-При **первом** запуске контейнер обучит модель (5–15 минут), затем поднимет сайт. Модель и анкеты сохраняются в томах `career_model` и `career_data`.
+**Модель уже в репозитории** (`career_model/`) и копируется в образ при сборке — переобучение при первом запуске не нужно. Если файлов модели нет, контейнер один раз запустит `train_model.py`.
 
 Остановка:
 
@@ -43,8 +43,14 @@ docker compose down
 
 ```bash
 pip install -r requirements.txt
-python train_model.py          # один раз: обучение модели
 python main.py                 # веб: http://127.0.0.1:7777
+```
+
+Модель уже лежит в `career_model/`. Переобучение только если меняли данные или направления:
+
+```bash
+python train_model.py
+docker compose build           # после переобучения — пересобрать образ
 ```
 
 #### Рекомендации по CSV
@@ -106,13 +112,14 @@ career-ai-system/
 ├── templates/index.html
 ├── static/                  # Логотип и статика
 ├── examples/
+├── career_model/            # Готовая модель (в git): .keras, scaler, binarizer
 ├── docker-compose.yml
 ├── Dockerfile
 ├── tests/test_smoke.py
 └── requirements.txt
 ```
 
-Папки `career_model/` и `data/` создаются при работе и в Git не коммитятся.
+Папки `data/` и `output/` создаются при работе и в Git не коммитятся. Модель — в `career_model/` (коммитится).
 
 ---
 
@@ -120,8 +127,17 @@ career-ai-system/
 
 После прохождения опроса на сайте:
 
-1. В `data/real/responses.csv` добавляется строка: 27 признаков + топ-5 рекомендаций (без ФИО и контактов).
+1. В **`data/real/responses.csv`** добавляется строка: 27 признаков + топ-5 рекомендаций (без ФИО и контактов).
 2. Если пользователь отправил отзыв — в ту же строку дописываются `chosen_fields` и `feedback_score`.
+
+Файл можно открыть в Excel, LibreOffice или блокноте. При запуске через Docker папка `data/` лежит рядом с проектом на вашем компьютере (не внутри контейнера).
+
+После изменения `docker-compose.yml` перезапустите контейнер:
+
+```bash
+docker compose down
+docker compose up -d
+```
 
 ---
 

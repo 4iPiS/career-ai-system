@@ -23,18 +23,13 @@ htmlcov/
 .env
 .env.*
 
-# Local runtime artifacts (mounted as volumes)
-career_model/
+# Runtime data (монтируются томами, не нужны в образе)
 data/
 output/
 profiles/
-*.h5
-*.keras
-*.pkl
-*.pkl.gz
 *.log
 
-# Docs and non-runtime files (keep README for image metadata if needed)
+# Docs and non-runtime files
 docs/
 Doxyfile
 *.md

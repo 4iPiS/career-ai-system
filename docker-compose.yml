@@ -10,12 +10,6 @@ services:
       TF_CPP_MIN_LOG_LEVEL: "3"
       PYTHONUNBUFFERED: "1"
     volumes:
-      - career_model:/app/career_model
-      - career_data:/app/data
-      - career_output:/app/output
+      - ./data:/app/data
+      - ./output:/app/output
     restart: unless-stopped
-
-volumes:
-  career_model:
-  career_data:
-  career_output:
